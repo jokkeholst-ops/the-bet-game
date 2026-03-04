@@ -539,6 +539,7 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
   const resolveBetVerified=(bet,r)=>{
     const drinkTotals={...(r.drinkTotals||{})};
     const giveTotals={...(r.giveTotals||{})};
+    const odds=(r.oddsMap||{})[bet.id]||1;
     const outcomes={}; // player -> {give, drink}
 
     r.players.forEach(p=>{
@@ -546,9 +547,10 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
       if(!w) return;
 
       if(w>0){
-        // long was RIGHT -> hand out wager
-        giveTotals[p.name]=(giveTotals[p.name]||0)+w;
-        outcomes[p.name]={give:w,drink:0};
+        // long was RIGHT -> hand out wager * odds
+        const g=Math.round(w*odds);
+        giveTotals[p.name]=(giveTotals[p.name]||0)+g;
+        outcomes[p.name]={give:g,drink:0};
       } else {
         // short was WRONG -> drink |w|
         const d=Math.abs(w);
@@ -562,6 +564,7 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
   const resolveBetExpired=(bet,r)=>{
     const drinkTotals={...(r.drinkTotals||{})};
     const giveTotals={...(r.giveTotals||{})};
+    const odds=(r.oddsMap||{})[bet.id]||1;
     const outcomes={};
 
     r.players.forEach(p=>{
@@ -569,8 +572,8 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
       if(!w) return;
 
       if(w<0){
-        // short was RIGHT -> hand out |w|
-        const g=Math.abs(w);
+        // short was RIGHT -> hand out |w| * odds
+        const g=Math.round(Math.abs(w)*odds);
         giveTotals[p.name]=(giveTotals[p.name]||0)+g;
         outcomes[p.name]={give:g,drink:0};
       } else {
