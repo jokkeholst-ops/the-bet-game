@@ -176,7 +176,7 @@ function VerifyPopup({bet,room,myName,onHandOut,onClose}) {
     h(Card,{className:"overlay-card card-green"},
       h("div",{className:"text-5xl mb3"},"✅"),
       h("p",{className:"font-black text-xl mb2 c-green"},"Bet verified!"),
-      h("p",{className:"muted mb1"},`${bet.author} bet`),
+      h("p",{className:"muted mb1"},`Person ${bet.author} did bet`),
       h("p",{className:"c-indigo font-semibold mb1"},bet.target),
       h("p",{className:"mb3"},bet.text),
 
@@ -192,7 +192,7 @@ function VerifyPopup({bet,room,myName,onHandOut,onClose}) {
     )
   );
 }
-function HandOutPopup({sips,players,onDone}) {({sips,players,onDone}) {({sips,players,onDone}) {({sips,players,onDone}) {
+function HandOutPopup({sips,players,onDone}) {
   const [chosen,setChosen]=useState(players[0]?.name||"");
   return h("div",{className:"overlay"},
     h(Card,{className:"overlay-card card-yellow"},
@@ -206,6 +206,7 @@ function HandOutPopup({sips,players,onDone}) {({sips,players,onDone}) {({sips,pl
     )
   );
 }
+
 
 // ── Landing ───────────────────────────────────────────────────
 function Landing({onHost,onJoin}) {
@@ -555,10 +556,6 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
       }
     });
     return {drinkTotals,giveTotals,outcomes};
-  };
-    r.players.forEach(p=>{const w=(r.wagers||{})[p.name]?.[bet.id];if(w&&w>0) t[p.name]=(t[p.name]||0)+w;});
-    return t;
-  };
   const endGame=useCallback(async()=>{
     if(endedRef.current) return; endedRef.current=true;
     const still=(room.bets||[]).filter(b=>(room.activeBets||[]).includes(b.id));
@@ -732,12 +729,12 @@ function EndPhase({room,myName}) {
 
     myGive>0 && h(Btn,{onClick:()=>setHandOutPopup({sips:myGive}),color:"yellow",full:true},"Hand out your remaining sips"),
     // Host-only: reset this same room so everyone can play again without sharing a new code
-    (room.host===myName) && h(Btn,{onClick:async()=>{
+    (room.hostName===myName) && h(Btn,{onClick:async()=>{
       const latest = await loadRoom(room.code);
       if(!latest) return;
       const u={
         ...latest,
-        phase:"setup",
+        phase:"lobby",
         bets:[],
         activeBets:[],
         verifiedBets:[],
