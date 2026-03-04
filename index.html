@@ -169,29 +169,27 @@ function Sel({value,onChange,options}) {
 }
 
 // ── Popups ────────────────────────────────────────────────────
-function VerifyPopup({bet,room,myName,onHandOut,onClose}) {
+function VerifyPopup({bet,myName,onClose}) {
   const outcomes = bet.outcomes || {};
   const mine = outcomes[myName] || {give:0, drink:0};
-  const myWagerRaw = (room.wagers || {})[myName]?.[bet.id] || 0;
-  const myWager = Math.abs(myWagerRaw);
-  const totalGive = (room.giveTotals || {})[myName] || 0;
+
+  // concise copy
+  const headline = "Bet hit!";
+  const didLine = `${bet.target} did:`;
+  const actionLine = bet.text;
 
   return h("div",{className:"overlay"},
     h(Card,{className:"overlay-card card-green"},
       h("div",{className:"text-5xl mb3"},"✅"),
-      h("p",{className:"font-black text-xl mb2 c-green"},"Bet verified!"),
-      h("p",{className:"muted mb1"},`Person ${bet.author} did bet`),
-      h("p",{className:"c-indigo font-semibold mb1"},bet.target),
-      h("p",{className:"mb3"},bet.text),
+      h("p",{className:"font-black text-xl mb2 c-green"},headline),
 
-      myWager>0 && h("div",{className:"mb3"},
-        mine.give>0 && h("p",{className:"font-black c-yellow",style:{margin:"0 0 .25rem 0"}},`You bet ${myWager} sip${myWager!==1?"s":""} and can hand out ${mine.give} sip${mine.give!==1?"s":""}.`),
-        mine.drink>0 && h("p",{className:"font-black c-pink",style:{margin:"0 0 .25rem 0"}},`You bet ${myWager} sip${myWager!==1?"s":""} and have to drink ${mine.drink} sip${mine.drink!==1?"s":""}.`),
-        mine.give>0 && h("p",{className:"muted text-sm",style:{margin:0}},`Total available to hand out: ${totalGive}`)
-      ),
+      h("p",{className:"c-indigo font-semibold mb1"},didLine),
+      h("p",{className:"mb3"},actionLine),
 
-      mine.give>0 && h(Btn,{onClick:()=>onHandOut(mine.give),color:"yellow",full:true},`Hand out ${mine.give} now`),
-      h("div",{className:"mt2"}),
+      mine.give>0 && h("p",{className:"font-black c-yellow mb3"},`You can now hand out ${mine.give} sip${mine.give!==1?"s":""}.`),
+      mine.drink>0 && h("p",{className:"font-black c-red mb3"},`You drink ${mine.drink} sip${mine.drink!==1?"s":""}.`),
+      (mine.give===0 && mine.drink===0) && h("p",{className:"muted mb3"},"No wager for you on this one."),
+
       h(Btn,{onClick:onClose,color:"green",full:true},"Got it!")
     )
   );
@@ -232,10 +230,13 @@ function Landing({onHost,onJoin}) {
 // ── Host Setup ────────────────────────────────────────────────
 function HostSetup({onStart}) {
   const [name,setName]=useState(""), [minutes,setMinutes]=useState(20);
+  const [maxTotal,setMaxTotal]=useState("14");
+  const [noLimit,setNoLimit]=useState(false);
   const code=useRef(genCode()).current;
   const start=async()=>{
     if(!name.trim()) return;
     const room={code,phase:"lobby",hostName:name.trim(),timerMinutes:minutes,
+      maxWagerTotal: (noLimit ? null : Math.max(1, Math.min(999, parseInt(maxTotal||"14",10) || 14))),
       players:[{name:name.trim(),group:null,id:genCode()}],
       bets:[],votes:{},wagers:{},oddsMap:{},verifiedBets:[],expiredBets:[],
       drinkTotals:{},giveTotals:{},timerEnd:null,guessLog:[],activeBets:[],
@@ -256,6 +257,16 @@ function HostSetup({onStart}) {
         h(Btn,{onClick:()=>setMinutes(m=>m+5),color:"gray",sm:true},"+")
       )
     ),
+    h(Card,{},
+      h("span",{className:"label"},"Max total wager per player (sum of abs wagers)"),
+      h("div",{className:"flex items-center gap3"},
+        h(Btn,{onClick:()=>setNoLimit(v=>!v),color:noLimit?"green":"gray",sm:true},noLimit?"No limit":"Set limit"),
+        !noLimit && h(Inp,{value:maxTotal,onChange:setMaxTotal,placeholder:"14",style:{maxWidth:"6rem"}}),
+        !noLimit && h("span",{className:"muted text-sm"},"sips")
+      ),
+      h("p",{className:"muted text-xs mt2"},"Counts both longs and shorts using absolute value. Per-bet max is still 14.")
+    ),
+
     h(Btn,{onClick:start,color:"green",full:true},"Create Room")
   );
 }
@@ -439,7 +450,26 @@ function WageringPhase({room,myName,isHost,onRoomUpdate}) {
   const existing=(room.wagers||{})[myName]||{};
   const [wagers,setWagers]=useState(()=>{const w={};myBets.forEach(b=>{w[b.id]=existing[b.id]??0;});return w;});
   const saved=Object.keys((room.wagers||{})[myName]||{}).length>=myBets.length&&myBets.length>0;
-  const setW=(id,val)=>setWagers(w=>({...w,[id]:Math.max(-SIPS,Math.min(SIPS,val))}));
+  const MAX_WAGER_TOTAL = (room.maxWagerTotal === undefined ? 14 : room.maxWagerTotal); // null => no limit
+  const setW=(id,val)=>setWagers(w=>{
+    const old=Number(w[id]||0);
+    // per-bet clamp
+    let v=Math.max(-SIPS,Math.min(SIPS,Number(val||0)));
+
+    if(MAX_WAGER_TOTAL===null){
+      return {...w,[id]:v};
+    }
+
+    const totalAbs=Object.values(w).reduce((s,x)=>s+Math.abs(Number(x||0)),0);
+    const baseTotal=totalAbs-Math.abs(old);
+    const remaining=Math.max(0,MAX_WAGER_TOTAL-baseTotal);
+
+    const sign=v<0?-1:1;
+    const mag=Math.min(Math.abs(v),remaining);
+    v=mag===0?0:sign*mag;
+
+    return {...w,[id]:v};
+  });
   const saveWagers=async()=>{
     const u={...room,wagers:{...(room.wagers||{}),[myName]:wagers}};
     await saveRoom(room.code,u); onRoomUpdate(u);
@@ -458,8 +488,17 @@ function WageringPhase({room,myName,isHost,onRoomUpdate}) {
     h("h2",{className:"text-xl font-bold"},"Place Your Wagers"),
     h(Card,{className:"card-yellow"},
       h("p",{className:"font-semibold text-sm c-yellow"},"💡 Wager guide"),
-      h("p",{className:"muted text-xs mt1"},"Positive = betting it WILL happen. Negative = shorting (betting it WON'T). 0 = sit it out.")
+      h("p",{className:"muted text-xs mt1"},"Positive = betting it WILL happen. Negative = shorting (betting it WON\'T). 0 = sit it out."),
+      h("p",{className:"muted text-xs mt1"}, ( (room.maxWagerTotal===null) ? "Max total wager: No limit." : `Max total wager: ${room.maxWagerTotal ?? 14} (sum of abs).` ) )
     ),
+      h("p",{className:"muted text-xs mt1"}, (() => {
+        const cap = (room.maxWagerTotal === undefined ? 14 : room.maxWagerTotal);
+        if(cap===null) return "Remaining budget: ∞";
+        const used = Object.values(wagers).reduce((s,x)=>s+Math.abs(Number(x||0)),0);
+        const rem = Math.max(0, cap - used);
+        return `Remaining budget: ${rem}`;
+      })() ),
+
     ...myBets.map(b=>{
       const odds=(room.oddsMap||{})[b.id]??1, w=wagers[b.id]??0, isShort=w<0;
       return h(Card,{key:b.id,className:isShort?"card-orange":""},
@@ -472,9 +511,27 @@ function WageringPhase({room,myName,isHost,onRoomUpdate}) {
           :`📈 Long — hand out ${Math.round(w*odds)} sips`
         ),
         h("div",{className:"flex items-center gap3"},
-          h(Btn,{onClick:()=>setW(b.id,w-1),color:"gray",sm:true,disabled:w<=-SIPS},"−"),
+          h(Btn,{onClick:()=>setW(b.id,w-1),color:"gray",sm:true,disabled: (()=>{
+            if(w<=-SIPS) return true;
+            const cap = (room.maxWagerTotal===undefined?14:room.maxWagerTotal);
+            if(cap===null) return false;
+            const totalAbs=Object.values(wagers).reduce((s,x)=>s+Math.abs(Number(x||0)),0);
+            const base=totalAbs-Math.abs(w);
+            const remaining=Math.max(0,cap-base);
+            const next=Math.max(-SIPS,Math.min(SIPS,w-1));
+            return Math.abs(next) > remaining;
+          })()},"−"),
           h("span",{className:`wager-num ${isShort?"c-orange":w===0?"c-muted":"c-green"}`},w),
-          h(Btn,{onClick:()=>setW(b.id,w+1),color:"gray",sm:true,disabled:w>=SIPS},"+")
+          h(Btn,{onClick:()=>setW(b.id,w+1),color:"gray",sm:true,disabled: (()=>{
+            if(w>=SIPS) return true;
+            const cap = (room.maxWagerTotal===undefined?14:room.maxWagerTotal);
+            if(cap===null) return false;
+            const totalAbs=Object.values(wagers).reduce((s,x)=>s+Math.abs(Number(x||0)),0);
+            const base=totalAbs-Math.abs(w);
+            const remaining=Math.max(0,cap-base);
+            const next=Math.max(-SIPS,Math.min(SIPS,w+1));
+            return Math.abs(next) > remaining;
+          })()},"+")
         )
       );
     }),
@@ -501,7 +558,6 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
   const [timeLeft,setTimeLeft]=useState(Math.max(0,(room.timerEnd||0)-Date.now()));
   const [guessText,setGuessText]=useState(""), [showGuess,setShowGuess]=useState(false);
   const [verifyPopup,setVerifyPopup]=useState(null);
-  const [handOutPopup,setHandOutPopup]=useState(null);
   const endedRef=useRef(false), lastVerifiedRef=useRef(null);
 
   useEffect(()=>{const iv=setInterval(()=>setTimeLeft(Math.max(0,(room.timerEnd||0)-Date.now())),1000);return()=>clearInterval(iv);},[room.timerEnd]);
@@ -623,23 +679,9 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
   return h("div",{className:"col",style:{paddingTop:"1rem"}},
     verifyPopup&&h(VerifyPopup,{
       bet:verifyPopup,
-      room,
       myName,
-      onHandOut:(sips)=>setHandOutPopup({sips}),
       onClose:()=>setVerifyPopup(null)
     }),
-    handOutPopup&&h(HandOutPopup,{sips:handOutPopup.sips,players:room.players.filter(p=>p.name!==myName),
-      onDone:async chosen=>{
-        // For scoring, handing out only reduces YOUR remaining give total.
-        const prevGive=room.giveTotals||{};
-        const myRem=prevGive[myName]||0;
-        const take=Math.min(myRem,Math.abs(handOutPopup.sips));
-        const u={...room,giveTotals:{...prevGive,[myName]:Math.max(0,myRem-take)}};
-        await saveRoom(room.code,u); onRoomUpdate(u); setHandOutPopup(null);
-      }
-    }),
-    h("div",{className:"row-between"},
-      h("span",{className:tClass},fmt(timeLeft)),
       h("span",{className:`badge ${myGroup==="A"?"badge-a":"badge-b"}`},myGroup==="A"?"🔵 Group A":"🔴 Group B")
     ),
     res&&h("div",{className:res.correct?"result-card-green":"result-card-red"},
@@ -689,22 +731,15 @@ function EndPhase({room,myName}) {
     give:giveTotals[n]||0,
     drink:drinkTotals[n]||0
   })).sort((a,b)=> (b.drink-a.drink) || (b.give-a.give));
-
-  const [handOutPopup,setHandOutPopup]=useState(null);
   const myGive=giveTotals[myName]||0;
   const myDrink=drinkTotals[myName]||0;
-
-  const doHandOut=async(chosen)=>{
-    const latest = await loadRoom(room.code);
-    if(!latest) return;
-    const g={...(latest.giveTotals||{})};
     const rem=g[myName]||0;
-    if(rem<=0) { setHandOutPopup(null); return; }
+    if(rem<=0) {  return; }
     // Reduce your remaining give total (receiver total is NOT tracked)
     g[myName]=0;
     const u={...latest,giveTotals:g};
     await saveRoom(latest.code,u);
-    setHandOutPopup(null);
+    
   };
 
   return h("div",{className:"col"},
@@ -732,8 +767,6 @@ function EndPhase({room,myName}) {
         ))
       )
     ),
-
-    myGive>0 && h(Btn,{onClick:()=>setHandOutPopup({sips:myGive}),color:"yellow",full:true},"Hand out your remaining sips"),
     // Host-only: reset this same room so everyone can play again without sharing a new code
     (room.hostName===myName) && h(Btn,{onClick:async()=>{
       const latest = await loadRoom(room.code);
