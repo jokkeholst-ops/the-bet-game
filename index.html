@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>The Bet Game 🍺</title>
+<title>The Bet Game 🍺(test)</title>
 <!-- React + ReactDOM (UMD builds, work everywhere) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -169,44 +169,27 @@ function Sel({value,onChange,options}) {
 }
 
 // ── Popups ────────────────────────────────────────────────────
-function VerifyPopup({bet,room,myName,onHandOut,onClose}) {
+function VerifyPopup({bet,room,myName,onClose}) {
   const outcomes = bet.outcomes || {};
   const mine = outcomes[myName] || {give:0, drink:0};
-  const myWagerRaw = (room.wagers || {})[myName]?.[bet.id] || 0;
-  const myWager = Math.abs(myWagerRaw);
-  const totalGive = (room.giveTotals || {})[myName] || 0;
+
+  const headline = "Bet hit!";
+  const didLine = `${bet.target} did:`;
+  const actionLine = bet.text;
 
   return h("div",{className:"overlay"},
     h(Card,{className:"overlay-card card-green"},
       h("div",{className:"text-5xl mb3"},"✅"),
-      h("p",{className:"font-black text-xl mb2 c-green"},"Bet verified!"),
-      h("p",{className:"muted mb1"},`Person ${bet.author} did bet`),
-      h("p",{className:"c-indigo font-semibold mb1"},bet.target),
-      h("p",{className:"mb3"},bet.text),
+      h("p",{className:"font-black text-xl mb2 c-green"},headline),
 
-      myWager>0 && h("div",{className:"mb3"},
-        mine.give>0 && h("p",{className:"font-black c-yellow",style:{margin:"0 0 .25rem 0"}},`You bet ${myWager} sip${myWager!==1?"s":""} and can hand out ${mine.give} sip${mine.give!==1?"s":""}.`),
-        mine.drink>0 && h("p",{className:"font-black c-pink",style:{margin:"0 0 .25rem 0"}},`You bet ${myWager} sip${myWager!==1?"s":""} and have to drink ${mine.drink} sip${mine.drink!==1?"s":""}.`),
-        mine.give>0 && h("p",{className:"muted text-sm",style:{margin:0}},`Total available to hand out: ${totalGive}`)
-      ),
+      h("p",{className:"c-indigo font-semibold mb1"},didLine),
+      h("p",{className:"mb3"},actionLine),
 
-      mine.give>0 && h(Btn,{onClick:()=>onHandOut(mine.give),color:"yellow",full:true},`Hand out ${mine.give} now`),
-      h("div",{className:"mt2"}),
+      mine.give>0 && h("p",{className:"font-black c-yellow mb3"},`You can now hand out ${mine.give} sip${mine.give!==1?"s":""}.`),
+      mine.drink>0 && h("p",{className:"font-black c-red mb3"},`You drink ${mine.drink} sip${mine.drink!==1?"s":""}.`),
+      (mine.give===0 && mine.drink===0) && h("p",{className:"muted mb3"},"No wager for you on this one."),
+
       h(Btn,{onClick:onClose,color:"green",full:true},"Got it!")
-    )
-  );
-}
-function HandOutPopup({sips,players,onDone}) {
-  const [chosen,setChosen]=useState(players[0]?.name||"");
-  return h("div",{className:"overlay"},
-    h(Card,{className:"overlay-card card-yellow"},
-      h("div",{className:"text-5xl mb3"},"🎉"),
-      h("p",{className:"font-black text-xl mb2 c-yellow"},"Hand Out Sips!"),
-      h("p",{className:"muted mb4"},`Choose who to hand out ${Math.abs(sips)} sips to:`),
-      h(Sel,{value:chosen,onChange:setChosen,options:players.map(p=>p.name)}),
-      h("div",{className:"mt4"},
-        h(Btn,{onClick:()=>onDone(chosen),color:"yellow",full:true},`Give ${Math.abs(sips)} sips to ${chosen}`)
-      )
     )
   );
 }
@@ -232,10 +215,13 @@ function Landing({onHost,onJoin}) {
 // ── Host Setup ────────────────────────────────────────────────
 function HostSetup({onStart}) {
   const [name,setName]=useState(""), [minutes,setMinutes]=useState(20);
+  const [maxTotal,setMaxTotal]=useState("14");
+  const [noLimit,setNoLimit]=useState(false);
   const code=useRef(genCode()).current;
   const start=async()=>{
     if(!name.trim()) return;
     const room={code,phase:"lobby",hostName:name.trim(),timerMinutes:minutes,
+      maxWagerTotal:(noLimit?null: (parseInt(maxTotal||"14",10)||14)),
       players:[{name:name.trim(),group:null,id:genCode()}],
       bets:[],votes:{},wagers:{},oddsMap:{},verifiedBets:[],expiredBets:[],
       drinkTotals:{},giveTotals:{},timerEnd:null,guessLog:[],activeBets:[],
@@ -255,6 +241,16 @@ function HostSetup({onStart}) {
         h("span",{className:"font-black text-3xl",style:{width:"3rem",textAlign:"center"}},minutes),
         h(Btn,{onClick:()=>setMinutes(m=>m+5),color:"gray",sm:true},"+")
       )
+
+    h(Card,{},
+      h("span",{className:"label"},"Max total wager per player (sum of abs wagers)"),
+      h("div",{className:"flex items-center gap3"},
+        h(Btn,{onClick:()=>setNoLimit(v=>!v),color:noLimit?"green":"gray",sm:true},noLimit?"No limit":"Set limit"),
+        !noLimit && h(Inp,{value:maxTotal,onChange:setMaxTotal,placeholder:"14",style:{maxWidth:"6rem"}}),
+        !noLimit && h("span",{className:"muted text-sm"},"sips")
+      ),
+      h("p",{className:"muted text-xs mt2"},"Counts both longs and shorts using absolute value. Per-bet max is still 14.")
+    ),
     ),
     h(Btn,{onClick:start,color:"green",full:true},"Create Room")
   );
@@ -439,7 +435,25 @@ function WageringPhase({room,myName,isHost,onRoomUpdate}) {
   const existing=(room.wagers||{})[myName]||{};
   const [wagers,setWagers]=useState(()=>{const w={};myBets.forEach(b=>{w[b.id]=existing[b.id]??0;});return w;});
   const saved=Object.keys((room.wagers||{})[myName]||{}).length>=myBets.length&&myBets.length>0;
-  const setW=(id,val)=>setWagers(w=>({...w,[id]:Math.max(-SIPS,Math.min(SIPS,val))}));
+  const MAX_WAGER_TOTAL = (room.maxWagerTotal===undefined ? 14 : room.maxWagerTotal); // null => no limit
+  const setW=(id,val)=>setWagers(w=>{
+    const old=Number(w[id]||0);
+    let v=Math.max(-SIPS,Math.min(SIPS,Number(val||0))); // per-bet cap still 14
+
+    if(MAX_WAGER_TOTAL===null){
+      return {...w,[id]:v};
+    }
+
+    const usedTotal=Object.values(w).reduce((s,x)=>s+Math.abs(Number(x||0)),0);
+    const base=usedTotal-Math.abs(old);
+    const remaining=Math.max(0,MAX_WAGER_TOTAL-base);
+
+    const sign=v<0?-1:1;
+    const mag=Math.min(Math.abs(v),remaining);
+    v = mag===0 ? 0 : sign*mag;
+
+    return {...w,[id]:v};
+  });
   const saveWagers=async()=>{
     const u={...room,wagers:{...(room.wagers||{}),[myName]:wagers}};
     await saveRoom(room.code,u); onRoomUpdate(u);
@@ -458,7 +472,14 @@ function WageringPhase({room,myName,isHost,onRoomUpdate}) {
     h("h2",{className:"text-xl font-bold"},"Place Your Wagers"),
     h(Card,{className:"card-yellow"},
       h("p",{className:"font-semibold text-sm c-yellow"},"💡 Wager guide"),
-      h("p",{className:"muted text-xs mt1"},"Positive = betting it WILL happen. Negative = shorting (betting it WON'T). 0 = sit it out.")
+      h("p",{className:"muted text-xs mt1"},"Positive = betting it WILL happen. Negative = shorting (betting it WON'T). 0 = sit it out."),
+      h("p",{className:"muted text-xs mt1"}, (()=>{
+        const cap=(room.maxWagerTotal===undefined?14:room.maxWagerTotal);
+        if(cap===null) return "Max total wager: No limit · Remaining: ∞";
+        const used=Object.values(wagers).reduce((s,x)=>s+Math.abs(Number(x||0)),0);
+        const rem=Math.max(0,cap-used);
+        return `Max total wager: ${cap} · Remaining: ${rem}`;
+      })() )
     ),
     ...myBets.map(b=>{
       const odds=(room.oddsMap||{})[b.id]??1, w=wagers[b.id]??0, isShort=w<0;
@@ -501,7 +522,6 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
   const [timeLeft,setTimeLeft]=useState(Math.max(0,(room.timerEnd||0)-Date.now()));
   const [guessText,setGuessText]=useState(""), [showGuess,setShowGuess]=useState(false);
   const [verifyPopup,setVerifyPopup]=useState(null);
-  const [handOutPopup,setHandOutPopup]=useState(null);
   const endedRef=useRef(false), lastVerifiedRef=useRef(null);
 
   useEffect(()=>{const iv=setInterval(()=>setTimeLeft(Math.max(0,(room.timerEnd||0)-Date.now())),1000);return()=>clearInterval(iv);},[room.timerEnd]);
@@ -625,21 +645,8 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
       bet:verifyPopup,
       room,
       myName,
-      onHandOut:(sips)=>setHandOutPopup({sips}),
       onClose:()=>setVerifyPopup(null)
     }),
-    handOutPopup&&h(HandOutPopup,{sips:handOutPopup.sips,players:room.players.filter(p=>p.name!==myName),
-      onDone:async chosen=>{
-        // For scoring, handing out only reduces YOUR remaining give total.
-        const prevGive=room.giveTotals||{};
-        const myRem=prevGive[myName]||0;
-        const take=Math.min(myRem,Math.abs(handOutPopup.sips));
-        const u={...room,giveTotals:{...prevGive,[myName]:Math.max(0,myRem-take)}};
-        await saveRoom(room.code,u); onRoomUpdate(u); setHandOutPopup(null);
-      }
-    }),
-    h("div",{className:"row-between"},
-      h("span",{className:tClass},fmt(timeLeft)),
       h("span",{className:`badge ${myGroup==="A"?"badge-a":"badge-b"}`},myGroup==="A"?"🔵 Group A":"🔴 Group B")
     ),
     res&&h("div",{className:res.correct?"result-card-green":"result-card-red"},
@@ -690,22 +697,8 @@ function EndPhase({room,myName}) {
     drink:drinkTotals[n]||0
   })).sort((a,b)=> (b.drink-a.drink) || (b.give-a.give));
 
-  const [handOutPopup,setHandOutPopup]=useState(null);
   const myGive=giveTotals[myName]||0;
   const myDrink=drinkTotals[myName]||0;
-
-  const doHandOut=async(chosen)=>{
-    const latest = await loadRoom(room.code);
-    if(!latest) return;
-    const g={...(latest.giveTotals||{})};
-    const rem=g[myName]||0;
-    if(rem<=0) { setHandOutPopup(null); return; }
-    // Reduce your remaining give total (receiver total is NOT tracked)
-    g[myName]=0;
-    const u={...latest,giveTotals:g};
-    await saveRoom(latest.code,u);
-    setHandOutPopup(null);
-  };
 
   return h("div",{className:"col"},
     handOutPopup&&h(HandOutPopup,{sips:myGive,players:room.players.filter(p=>p.name!==myName),
@@ -733,7 +726,6 @@ function EndPhase({room,myName}) {
       )
     ),
 
-    myGive>0 && h(Btn,{onClick:()=>setHandOutPopup({sips:myGive}),color:"yellow",full:true},"Hand out your remaining sips"),
     // Host-only: reset this same room so everyone can play again without sharing a new code
     (room.hostName===myName) && h(Btn,{onClick:async()=>{
       const latest = await loadRoom(room.code);
