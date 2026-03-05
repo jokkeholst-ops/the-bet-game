@@ -619,7 +619,6 @@ function LivePhase({room,myName,isHost,onRoomUpdate}) {
       } else {
         // Short hit -> drink |w| now (counts toward end totals)
         const d=Math.abs(w);
-        drinkTotals[p.name]=(drinkTotals[p.name]||0)+d;
         outcomes[p.name]={give:0,drink:d};
       }
     });
