@@ -232,7 +232,7 @@ const verifyBet=async bet=>{
   showMissed && h("div",{className:"overlay"},
   h(Card,{className:"overlay-card card-yellow"},
     h("div",{className:"text-5xl mb3"},"🔔"),
-    h("p",{className:"font-black text-xl mb2 c-yellow"},"Missed bet hits"),
+    h("p",{className:"font-black text-xl mb2 c-yellow"},"Bet that have hit"),
     h("div",{style:{maxHeight:"50vh", overflowY:"auto", textAlign:"left"}},
       ...(missedHitEvents.slice().reverse().map(ev => {
         const bet = (room.bets || []).find(b => b.id === ev.betId);
