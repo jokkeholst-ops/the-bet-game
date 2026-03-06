@@ -2,8 +2,9 @@
 /* Main app entry */
 window.BG = window.BG || {};
 const { h, useState, useEffect, useRef, useCallback } = BG.core;
-const { saveRoom, subscribeRoom, loadRoom } = BG.fb;
+const { Btn, Card, Inp, Sel } = BG.ui;   // <-- this line fixes it
 const { Landing, HostSetup, Lobby, BettingPhase, VotingPhase, WageringPhase, LivePhase, EndPhase } = BG.phases;
+const { subscribeRoom, loadRoom, saveRoom } = BG.fb;
 
 function App() {
   const [screen,setScreen]=useState("landing");
