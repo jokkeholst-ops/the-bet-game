@@ -67,7 +67,7 @@ function RulesPopup({onClose}) {
       h("p",{className:"font-black text-xl mb2 c-yellow"},"Rules"),
       h("div",{style:{textAlign:"left"}},
         h("p",{className:"muted text-sm mb2"},"1) Make bets (each player writes bets about the other group)."),
-        h("p",{className:"muted text-sm mb2"},"2) Vote likelihood to set odds."),
+        h("p",{className:"muted text-sm mb2"},"2) Vote on the likelihood of the bets coming true."),
         h("p",{className:"muted text-sm mb2"},"3) Wager on ALL bets from your group (positive = it happens, negative = it won’t)."),
         h("p",{className:"muted text-sm mb2"},"4) During the game, verify a bet when it happens:"),
         h("p",{className:"muted text-sm mb2",style:{marginLeft:"0.75rem"}},"• Long hits: you can hand out (wager × odds) sips (shown in popup)."),
@@ -75,7 +75,6 @@ function RulesPopup({onClose}) {
         h("p",{className:"muted text-sm mb2"},"5) End of game: any unverified bets are treated as ‘didn’t happen’."),
         h("p",{className:"muted text-sm mb2",style:{marginLeft:"0.75rem"}},"• Long didn’t hit: you drink your wagered sips (counts in final totals)."),
         h("p",{className:"muted text-sm mb2",style:{marginLeft:"0.75rem"}},"• Short didn’t hit: you can hand out your wagered sips (counts in final totals)."),
-        h("p",{className:"muted text-xs"},"Tip: Max total wager (sum of abs wagers) can be set by the host.")
       ),
       h("div",{className:"mt4"}),
       h(Btn,{onClick:onClose,color:"yellow",full:true},"Got it!")
