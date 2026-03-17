@@ -87,9 +87,6 @@ function HostSetup({onStart}) {
           style:{maxWidth:"4.5rem"}
         }),
         h("span",{className:"muted text-sm"},"min")
-      ),
-      h("p",{className:"muted text-xs mt2"},
-        `Total: ${Math.round(Math.max(0,durationMs)/60000)} minutes (min 5)`
       )
     ),
 
